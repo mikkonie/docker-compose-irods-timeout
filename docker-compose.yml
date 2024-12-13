@@ -1,0 +1,73 @@
+services:
+
+  postgres:
+    image: postgres:16
+    shm_size: 512mb
+    environment:
+      POSTGRES_USER: ${POSTGRES_USERNAME}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: sodar
+    command: ["postgres", "-c", "log_min_messages=error"]
+    ports:
+      - "5432:5432"
+    networks:
+      - sodar
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: ./volumes/postgres/data
+        target: /var/lib/postgresql/data
+
+  irods:
+    image: ghcr.io/bihealth/irods-docker:${IRODS_VERSION}
+    environment:
+      IRODS_HOST_NAME: irods
+      IRODS_ICAT_DBUSER: ${POSTGRES_USERNAME}
+      IRODS_ICAT_DBPASS: ${POSTGRES_PASSWORD}
+      IRODS_ADMIN_USER: ${IRODS_USER}
+      IRODS_ADMIN_PASS: ${IRODS_PASS}
+      IRODS_ZONE_NAME: sodarZone
+      IRODS_CLIENT_SERVER_NEGOTIATION: ${IRODS_CLIENT_SERVER_NEGOTIATION}
+      IRODS_CLIENT_SERVER_POLICY: ${IRODS_CLIENT_SERVER_POLICY}
+      IRODS_ZONE_KEY: ${IRODS_ZONE_KEY}
+      IRODS_NEGOTIATION_KEY: ${IRODS_NEGOTIATION_KEY}
+      IRODS_PASSWORD_SALT: ${IRODS_PASSWORD_SALT}
+      IRODS_CONTROL_PLANE_KEY: ${IRODS_CONTROL_PLANE_KEY}
+      IRODS_SSL_CERTIFICATE_CHAIN_FILE: ${IRODS_SSL_CERTIFICATE_CHAIN_FILE}
+      IRODS_SSL_CERTIFICATE_KEY_FILE: ${IRODS_SSL_CERTIFICATE_KEY_FILE}
+      IRODS_SSL_DH_PARAMS_FILE: ${IRODS_SSL_DH_PARAMS_FILE}
+      IRODS_SSL_VERIFY_SERVER: ${IRODS_SSL_VERIFY_SERVER}
+      IRODS_DEFAULT_HASH_SCHEME: MD5
+      IRODS_SSSD_AUTH: 0
+      IRODS_SODAR_AUTH: ${IRODS_SODAR_AUTH}
+      IRODS_SODAR_API_HOST: ${IRODS_SODAR_API_HOST}
+      IRODS_PASSWORD_MIN_TIME: ${IRODS_PASSWORD_MIN_TIME}
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    shm_size: '2gb'
+    ports:
+      - "1247:1247"
+    hostname: irods
+    networks:
+      - sodar
+    extra_hosts:
+     - host.docker.internal:host-gateway
+    volumes:
+      - type: bind  # iRODS configuration
+        source: ./config/irods/etc
+        target: /etc/irods
+      # - type: bind  # Traefik configuration for shared certs
+      #   source: ./config/traefik/tls
+      #   target: /etc/traefik/tls
+      - type: bind  # Log files
+        source: ./volumes/irods/log
+        target: /var/log/irods
+      - type: bind  # File storage
+        source: ./volumes/irods/vault
+        target: /data/Vault
+
+networks:
+  sodar:
+    driver_opts:
+      com.docker.network.bridge.name: ${NETWORK_BRIDGE_NAME}
